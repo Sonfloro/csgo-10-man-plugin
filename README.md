@@ -10,4 +10,4 @@ Commands:
 
 !clearCaptains - Clears the captains
 
-.captains - Displays who the captains are (Going to change to !captains
+.captains - Displays who the captains are (Going to change to !captains)
