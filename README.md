@@ -11,3 +11,9 @@ Commands:
 !clearCaptains - Clears the captains
 
 .captains - Displays who the captains are (Going to change to !captains)
+
+!pause - Calls for a pause in the next freezetime
+
+!unpause - Requests for an unpause (Requires request from both teams to unpause)
+
+!forceUnpause - (Owner only) Forces an unpause
