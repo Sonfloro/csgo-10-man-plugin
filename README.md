@@ -10,7 +10,7 @@ Commands:
 
 !clearCaptains - Clears the captains
 
-.captains or !captains - Displays who the captains are
+!captains or .captains - Displays who the captains are
 
 !pause - Calls for a pause in the next freezetime
 
