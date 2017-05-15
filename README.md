@@ -4,13 +4,13 @@ TODO: Add more info
 
 Commands:
 
-!setCaptain [PlayerName] - Sets [PlayerName] as a captain, use twice to set both captains
+!setCaptain - Opens up a menu to select who you want as captain. After the first captain is chosen, the second time you use the comamnd, the menu will only display plays not on the first captain's team.
 
 !startGame - Starts the game if two captains have been set
 
 !clearCaptains - Clears the captains
 
-.captains - Displays who the captains are (Going to change to !captains)
+.captains or !captains - Displays who the captains are
 
 !pause - Calls for a pause in the next freezetime
 
