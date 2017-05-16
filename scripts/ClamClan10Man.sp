@@ -36,7 +36,7 @@ Setup !pause command: DONE
 
 Disable commands during the 10 man: DONE
 
-Add random captains function
+Add random captains function: DONE
 
 Add captian selection menu: DONE
 
@@ -57,7 +57,6 @@ bool b_team2Unpause = false;
 bool b_team3Unpause = false;
 bool b_CaptainsSet = false;
 bool b_TeamChange = false;
-bool b_firstCaptChosen = false;
 int g_captain1CID;
 int g_captain2CID;
 Handle g_hLocked = INVALID_HANDLE;
@@ -399,21 +398,9 @@ void create_CaptainMenu(int callerClient)
 			GetClientName(i, temp, sizeof(temp));
 			if (strcmp(g_sCaptain1, temp, false) != 0)
 			{
-				if (b_firstCaptChosen)
-				{
-					char Client_name[MAX_NAME_LENGTH];
-					GetClientName(i, Client_name, sizeof(Client_name));
-					if (GetClientTeam(i) != GetClientTeam(g_captain1CID))
-					{
-						menu.AddItem(Client_name, Client_name);
-					}
-				}
-				else
-				{
-					char Client_name[MAX_NAME_LENGTH];
-					GetClientName(i, Client_name, sizeof(Client_name));
-					menu.AddItem(Client_name, Client_name);
-				}
+				char Client_name[MAX_NAME_LENGTH];
+				GetClientName(i, Client_name, sizeof(Client_name));
+				menu.AddItem(Client_name, Client_name);
 			}
 		}
 	}
@@ -436,7 +423,7 @@ public int CaptainMenuHandler(Menu menu, MenuAction action, int param1, int para
 			{
 				g_sCaptain1 = info;
 				PrintToChatAll("\x01[\x07ClamClan\x01]  Added %s as first captain.", g_sCaptain1);
-				b_firstCaptChosen = true;
+				delete menu;
 				for (int i = 1; i < MaxClients; i++)
 				{
 					if (IsClientConnected(i))
@@ -449,7 +436,6 @@ public int CaptainMenuHandler(Menu menu, MenuAction action, int param1, int para
 						}
 					}
 				}
-				delete menu;
 			}
 			else if (strlen(g_sCaptain2) == 0)
 			{
@@ -771,7 +757,57 @@ public Action cmd_setCaptain(int client, int args)
 
 public Action cmd_randomCaptains(int client, int args)
 {
+	int loop = 0; 
+	char players[10][MAX_NAME_LENGTH];
+	for (int i = 1; i < MaxClients; i++)
+	{
+		if (IsClientConnected(i))
+		{
+			char temp[MAX_NAME_LENGTH];
+			GetClientName(i, temp, sizeof(temp));
+			for (int j = 0; j < MAX_NAME_LENGTH; j++)
+			{
+				players[loop][j] = temp[j];
+			}
+			if (loop < 10)
+			{
+				loop++;
+			}
+		}
+	}
 	
+	//int randomNumberArray[10] =  { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+	int capt1Number = GetRandomInt(0, 9);
+	int capt2Number = 0;
+	do 
+	{
+		capt2Number = GetRandomInt(0, 9);
+	} while (capt1Number == capt2Number);
+	
+	for (int i = 0; i < 10; i++)
+	{
+		if (capt1Number == i)
+		{
+			char temp[MAX_NAME_LENGTH];
+			for (int j = 0; j < MAX_NAME_LENGTH; j++)
+			{
+				temp[j] += players[i][j];
+			}
+			g_sCaptain1 = temp;
+			PrintToChatAll("\x01[\x07ClamClan\x01]  Added %s as first captain.", g_sCaptain1);
+		}
+		if (capt2Number == i)
+		{
+			char temp[MAX_NAME_LENGTH];
+			for (int j = 0; j < MAX_NAME_LENGTH; j++)
+			{
+				temp[j] += players[i][j];
+			}
+			g_sCaptain2 = temp;
+			PrintToChatAll("\x01[\x07ClamClan\x01]  Added %s as second captain.", g_sCaptain2);
+			b_CaptainsSet = true;
+		}
+	}
 }
 
 
