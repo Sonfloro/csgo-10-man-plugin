@@ -3,11 +3,12 @@
 #define DEBUG
 
 #define PLUGIN_AUTHOR "Sonfloro"
-#define PLUGIN_VERSION "0.05"
+#define PLUGIN_VERSION "0.06"
 
 #include <sourcemod>
 #include <cstrike>
 #include <sdktools>
+#include <convars>
 
 #pragma newdecls required
 
@@ -30,7 +31,7 @@ Remove redundent For loops and use more global variables for common things (ie. 
 
 Setup autoexec for configs (knife round, warmup, live game): DONE
 
-Program a ready-up system for warmup and before match starts
+Program a ready-up system for warmup and before match starts: DONE
 
 Setup !pause command: DONE
 
@@ -42,6 +43,7 @@ Add captian selection menu: DONE
 
 Add "End Game" function that either restarts the server or the map and sets the game back to warmup.
 
+Implement the readyUp plugin.
 */
 char ownerID[17] = "76561198178274343";
 char g_sCaptain1[MAX_NAME_LENGTH];
@@ -60,7 +62,9 @@ bool b_TeamChange = false;
 int g_captain1CID;
 int g_captain2CID;
 Handle g_hLocked = INVALID_HANDLE;
-
+Handle g_PlayersAreReady = INVALID_HANDLE;
+Handle g_ReadyUpStatus = INVALID_HANDLE;
+Handle g_StartReadyUp = INVALID_HANDLE;
 
 
 public void OnPluginStart()
@@ -79,6 +83,7 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_unpause", cmd_unpauseMatch);
 	RegConsoleCmd("sm_captains", cmd_captains);
 	
+	
 	HookEvent("server_cvar", Event_serverCvar, EventHookMode_Pre);
 	HookEvent("round_end", Event_RoundEnd);
 	HookEvent("player_death", Event_PlayerDeath);
@@ -86,6 +91,10 @@ public void OnPluginStart()
 	HookEvent("bomb_exploded", Event_BombExploded, EventHookMode_Post);
 	AddCommandListener(Command_JoinTeam, "jointeam");
 	g_hLocked = CreateConVar("sm_lock_teams", "1", "Enable or disable locking teams during match");
+	g_PlayersAreReady = FindConVar("sm_PlayersAreReady");
+	g_ReadyUpStatus = FindConVar("sm_readyUpStatus");
+	g_StartReadyUp = FindConVar("sm_startReadyUp");
+	HookConVarChange(g_PlayersAreReady, OnPlayersAreReadyChange);
 }
 
 
@@ -109,7 +118,7 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
 {
 
 	char displayCaptains[] = ".captains";
-
+	
 	if (strcmp(sArgs[0], displayCaptains, false) == 0)
 	{
 		if (b_CaptainsSet)
@@ -125,6 +134,16 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
 	}
 	return Plugin_Continue;
 }
+
+public void OnPlayersAreReadyChange(ConVar convar, char[] oldValue, char[] newValue)
+{
+	if (StringToInt(newValue) == 1 && b_CaptainsSet)
+	{
+		ServerCommand("sm_startGame");
+	}
+}
+
+
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
@@ -302,8 +321,14 @@ public int KnifeMenuHandler(Menu menu, MenuAction action, int param1, int param2
 				{
 					for (int i = 0; i < 5; i++)
 					{
-						ChangeClientTeam(TteamIndex[i], 3);
-						ChangeClientTeam(CTteamIndex[i], 2);
+						if (TteamIndex[i] != 0)
+						{	
+							ChangeClientTeam(TteamIndex[i], 3);
+						}
+						if (CTteamIndex[i] != 0)
+						{
+							ChangeClientTeam(CTteamIndex[i], 2);
+						}
 					}
 					delete menu;
 					ServerCommand("sm_setServer");
@@ -339,10 +364,13 @@ public Action respawnTimer(Handle timer, any user)
 {
 	if (b_warmup)
 	{
-		CS_RespawnPlayer(user);
-		if (GetClientTeam(user) > 1)
-		{
-			SetEntProp(user, Prop_Send, "m_iAccount", 16000);
+		if (IsClientConnected(user))
+		{		
+			CS_RespawnPlayer(user);
+			if (GetClientTeam(user) > 1)
+			{
+				SetEntProp(user, Prop_Send, "m_iAccount", 16000);
+			}
 		}
 	}
 }
@@ -353,6 +381,11 @@ public Action teamChangeRespawnTimer(Handle timer, int user)
 	{
 		CS_RespawnPlayer(user);
 	}
+}
+
+public Action waitTimer(Handle timer)
+{
+	create_teamMenu(); 
 }
 
 public Action Command_JoinTeam(int client, const char[] command, int args)
@@ -371,21 +404,6 @@ public Action Command_JoinTeam(int client, const char[] command, int args)
 
     return Plugin_Continue;
 }  
-
-/*
-public Action cmd_respawn(int client, int args)
-{
-	if (b_warmup)
-	{
-		CS_RespawnPlayer(client);
-		if (GetClientTeam(client) > 1)
-		{
-			SetEntProp(client, Prop_Send, "m_iAccount", 16000);
-		}
-	}
-	return Plugin_Handled;
-}
-*/
 
 void create_CaptainMenu(int callerClient)
 {
@@ -442,6 +460,7 @@ public int CaptainMenuHandler(Menu menu, MenuAction action, int param1, int para
 				g_sCaptain2 = info;
 				PrintToChatAll("\x01[\x07ClamClan\x01]  Added %s as second captain.", g_sCaptain2);
 				b_CaptainsSet = true;
+				SetConVarBool(g_StartReadyUp, true);
 				delete menu;
 			}
 		}
@@ -537,23 +556,6 @@ void setPickTeam(char[] name)
 	}
 }
 
-/*
-public Action cmd_rejoin(int client, int args)
-{
-	if (b_warmup)
-	{
-		for (int i = 1; i < MaxClients; i++)
-		{
-			if (IsClientConnected(i))
-			{
-				ChangeClientTeam(i, 3);
-			}
-		}
-	}
-	return Plugin_Handled;	
-}
-*/
-
 public Action cmd_startGame(int client, int args)
 {
 	char capCheck[MAX_NAME_LENGTH];
@@ -593,7 +595,7 @@ public Action cmd_startGame(int client, int args)
 		ServerCommand("sv_pausable 1");
 		ServerCommand("mp_pause_match");
 		ServerCommand("sv_cheats 0"); 
-		create_teamMenu(); 
+		CreateTimer(3.0, waitTimer);
 	}
 	else
 	{
@@ -603,34 +605,6 @@ public Action cmd_startGame(int client, int args)
 	return Plugin_Handled;
 }
 
-
-
-// Deprecating for CaptainMenu
-/*
-public Action cmd_setCaptain(int client, int args)
-{
-	if (!b_gameStarted)
-	{
-		if (strlen(g_sCaptain1) == 0)
-		{
-			GetCmdArg(1, g_sCaptain1, sizeof(g_sCaptain1));
-			PrintToChatAll("\x01[\x07ClamClan\x01]  Added %s as first captain.", g_sCaptain1);
-		}
-		else if (strlen(g_sCaptain2) == 0)
-		{
-			GetCmdArg(1, g_sCaptain2, sizeof(g_sCaptain2));
-			PrintToChatAll("\x01[\x07ClamClan\x01]  Added %s as second captain.", g_sCaptain2);
-			b_CaptainsSet = true;
-		}
-		else
-		{
-			PrintToChatAll("\x01[\x07ClamClan\x01]  Both Captains are already selected, use !clearCaptains to reset captains");
-		}
-	}
-	return Plugin_Handled;
-}
-*/
-
 public Action cmd_clearCaptains(int client, int args)
 {
 	if (!b_gameStarted)
@@ -638,6 +612,7 @@ public Action cmd_clearCaptains(int client, int args)
 		g_sCaptain1 = "";
 		g_sCaptain2 = "";
 		b_CaptainsSet = false;
+		SetConVarBool(g_ReadyUpStatus, false);
 		PrintToChatAll("\x01[\x07ClamClan\x01]  Captains have been cleared! You may now set new captains.");
 	}
 	return Plugin_Handled;
@@ -651,7 +626,7 @@ public Action cmd_setServer(int client, int args)
 	SetConVarBool(g_hLocked, true);
 	ServerCommand("sv_cheats 1");
 	ServerCommand("exec setup10Man.cfg");
-	PrintToChatAll("\x01[\x07ClamClan\x01]  ClamClan official CS:GO 10 Man Server Config executed (version 0.05)");
+	PrintToChatAll("\x01[\x07ClamClan\x01]  ClamClan official CS:GO 10 Man Server Config executed");
 	
 	
 	return Plugin_Handled;
@@ -775,8 +750,6 @@ public Action cmd_randomCaptains(int client, int args)
 			}
 		}
 	}
-	
-	//int randomNumberArray[10] =  { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 	int capt1Number = GetRandomInt(0, 9);
 	int capt2Number = 0;
 	do 
@@ -808,6 +781,7 @@ public Action cmd_randomCaptains(int client, int args)
 			b_CaptainsSet = true;
 		}
 	}
+	SetConVarBool(g_StartReadyUp, true);
 }
 
 
