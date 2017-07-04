@@ -17,3 +17,9 @@ Commands:
 !unpause - Requests for an unpause (Requires request from both teams to unpause)
 
 !forceUnpause - (Owner only) Forces an unpause
+
+!randomCaptains
+
+!howMany
+
+!swapPlayer (old player steam2 ID) (new player steam2ID)
